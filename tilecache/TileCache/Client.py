@@ -150,6 +150,9 @@ def main ():
     from Service import Service, cfgfiles
     from Layer import Layer
     svc = Service.load(*cfgfiles)
+    if svc.metadata.has_key('exception'):
+        parser.error(str(svc.metadata['exception'])+"\nTraceback:\n"+svc.metadata['traceback'])
+
     layer = svc.layers[args[0]]
     
     if options.bbox:

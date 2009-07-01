@@ -4,7 +4,7 @@ from TileCache.Cache import Cache
 import sys, os, time, warnings
 
 class Disk (Cache):
-    def __init__ (self, base = None, umask = '002', **kwargs):
+    def __init__ (self, base = None, umask = '002', use_tms_paths = "False", **kwargs):
         Cache.__init__(self, **kwargs)
         self.basedir = base
         self.umask = int(umask, 0)
@@ -18,7 +18,13 @@ class Disk (Cache):
         
         if not self.access(base, 'read'):
             self.makedirs(base)
-        
+
+        if use_tms_paths.lower() in ("true", "yes", "1"):
+            use_tms_paths = True
+        elif use_tms_paths.lower() == "flipped":
+            use_tms_paths = "google"
+        self.use_tms_paths = use_tms_paths
+
     def makedirs(self, path, hide_dir_exists=True):
         if hasattr(os, "umask"):
             old_umask = os.umask(self.umask)
@@ -48,17 +54,27 @@ class Disk (Cache):
                 return os.access(path, os.W_OK)
 
     def getKey (self, tile):
-        components = ( self.basedir,
-                       tile.layer.name,
-                       "%02d" % tile.z,
-                       "%03d" % int(tile.x / 1000000),
-                       "%03d" % (int(tile.x / 1000) % 1000),
-                       "%03d" % (int(tile.x) % 1000),
-                       "%03d" % int(tile.y / 1000000),
-                       "%03d" % (int(tile.y / 1000) % 1000),
-                       "%03d.%s" % (int(tile.y) % 1000, tile.layer.extension)
-                    )
-        filename = os.path.join( *components )
+        if self.use_tms_paths == True or self.use_tms_paths == "flipped":
+            grid = tile.layer.grid(tile.z)
+            y = tile.y
+            if self.use_tms_paths == "flipped":
+                y = int(grid[1] - 1 - tile.y)
+            version = "1.0.0"
+            path = "/".join(map(str, [version, tile.layer.name, tile.z, tile.x, y]))
+            path = ".".join(map(str, [path, tile.layer.extension]))
+            filename = self.basedir + '/' + path
+        else:
+            components = ( self.basedir,
+                           tile.layer.name,
+                           "%02d" % tile.z,
+                           "%03d" % int(tile.x / 1000000),
+                           "%03d" % (int(tile.x / 1000) % 1000),
+                           "%03d" % (int(tile.x) % 1000),
+                           "%03d" % int(tile.y / 1000000),
+                           "%03d" % (int(tile.y / 1000) % 1000),
+                           "%03d.%s" % (int(tile.y) % 1000, tile.layer.extension)
+                         )
+            filename = os.path.join( *components )
         return filename
 
     def get (self, tile):
